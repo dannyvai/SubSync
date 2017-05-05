@@ -1,0 +1,6 @@
+*.json
+*.ogg
+*.srt
+keys.py
+*.pyc
+.DS_Store

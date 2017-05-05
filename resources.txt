@@ -1,0 +1,2 @@
+https://github.com/RafayGhafoor/Subscene-Subtitle-Grabber
+https://github.com/byroot/pysrt
