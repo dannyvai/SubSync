@@ -6,7 +6,8 @@ import argparse
 import subprocess
 import json
 
-import numpy as np
+#import numpy as np
+import np_alternative as np
 
 import threading
 import re
@@ -44,12 +45,15 @@ def calculate_subtitle_shift(
     num_segments = len(sample_times)
 
     for seg_idx in range(0,num_segments):
-        if not diff_segments[seg_idx].size <  min_words:
-            diff_mean_vec.append(np.mean(diff_segments[seg_idx]))
+        #print diff_segments[seg_idx]
+        if not len(diff_segments[seg_idx]) <  min_words:
+            diff_mean_vec.append(np.mean_list(diff_segments[seg_idx]))
             diff_time_vec.append(sample_times[seg_idx] + sample_duration/2.)
         else:
             print "diff_segments[seg_idx].size <  min_words"
 
+    #print diff_mean_vec
+    #print diff_time_vec
     for i in range (0,len(start_t)):
         ts = start_t[i]
         te = end_t[i]
@@ -58,7 +62,7 @@ def calculate_subtitle_shift(
         elif ts > diff_time_vec[-1]:
             shift = diff_mean_vec[-1] - shift_wanted
         else:
-            shift = np.interp(ts,diff_time_vec,diff_mean_vec) - shift_wanted
+            shift = np.interp1d_list(diff_time_vec,diff_mean_vec,ts) - shift_wanted
 
         start_t[i] += shift
         end_t[i] += shift
@@ -90,7 +94,7 @@ def compare_words(
         if 'results' not in result.keys():
             #TODO should be NaN
             print("Should be NaN :: 'results' not in result.keys():")
-            diff_segments.append(np.array(0))
+            diff_segments.append([0])
             continue
 
         t_ws_vid_vec = []
@@ -112,10 +116,12 @@ def compare_words(
                 time_min = time_word_start - search_win
                 time_max = time_word_start + search_win
                 #print time_min,time_max
-                min_idx = np.where(start_t > time_min)
-                max_idx = np.where(start_t < time_max)
-                intersection = np.intersect1d(min_idx,max_idx)
-                #print intersection
+                min_idx = np.list_where_gt(start_t, time_min)
+                max_idx = np.list_where_lt(start_t, time_max)
+                #print "Min",min_idx
+                #print "Max",max_idx
+                intersection = np.intersect1d_list(min_idx,max_idx)
+                #print "Inter",intersection
 
                 for word_idx in intersection:
                     word_srt = first_sentance_words[word_idx]
@@ -124,25 +130,35 @@ def compare_words(
                         t_ws_vid_vec.append(time_word_start)
                         t_ws_srt_vec.append(start_t[word_idx])
                         match_words.append(word)
+                        break
 
         if len(match_words) == 0:
             #TODO should be NaN
             print("Should be NaN :: len(match_words) == 0")
-            diff_segments.append(np.array(0))
+            diff_segments.append([0])
         elif len(match_words) < min_words:
             #TODO should be NaN
             print("Should be NaN :: len(match_words) < min_words")
-            diff_segments.append(np.array(0))
+            diff_segments.append([0])
         else:
-            diff_temp = np.array(t_ws_vid_vec).astype('float') - np.array(t_ws_srt_vec).astype('float')
-            diff_m = np.median(diff_temp)
-            dist = diff_temp - diff_m
-            i_ok = np.where(np.abs(dist) < max_dist)
-            diff_temp = diff_temp[i_ok]
-            if diff_temp.size  < min_words :
+
+            diff_temp = np.subtract_lists(t_ws_vid_vec,t_ws_srt_vec)
+            #print "Diff temp:: " ,diff_temp
+            diff_m = np.median_list(diff_temp)
+            #print "Median::",diff_m
+            dist = np.subtract_list_const(diff_temp, diff_m)
+            #print "Dist",dist
+            #print "Max dist :: ",max_dist
+            i_ok = np.list_where_lt(np.list_abs(dist), max_dist)
+            diff_temp = np.list_on_indices(diff_temp,i_ok)
+            #print "Diff temp :: ",diff_temp
+            #print match_words
+            #print t_ws_vid_vec
+            #print t_ws_srt_vec
+            if len(diff_temp)  < min_words :
                 #TODO should be NaN
                 print("Should be NaN :: i_ok[0].size  < min_words")
-                diff_segments.append(np.array(0))
+                diff_segments.append([0])
             else :
                 diff_segments.append(diff_temp)
 
@@ -292,7 +308,7 @@ def download_subtitles(video_name,where='.'):
 def get_video_name_from_path(video_path):
     return video_path.split(os.path.sep)[-1].split('.')[0]
 
-def main():
+def download_and_create_shifted_srt(video_path,output_dir,to_download=True,subtitle_file=''):
 
     credits_length = 30; #Seconds
     intro_length = 30; #Seconds
@@ -303,32 +319,17 @@ def main():
     min_words = 4;
     shift_wanted = 0.1; #Seconds
 
-
-    parser = argparse.ArgumentParser(description='SubSync')
-
-    parser.add_argument('-f','--filename',help='filename path',default='')
-    parser.add_argument('-od','--dir',help='output dir',default='.')
-    parser.add_argument('-d','--download',dest='download',help='download subtitles',action='store_true')
-    parser.add_argument('-nd','--no-download',dest='download',help='Dont download subtitles',action='store_false')
-    parser.add_argument('-s','--subtitle',help='subtitle file',default='')
-    args = parser.parse_args()
-
-
-
-    video_path = args.filename
-
-    video_name = get_video_name_from_path(args.filename)
+    video_name = get_video_name_from_path(video_path)
     print ("Video name is : {} ".format(video_name))
-    output_dir = args.dir
 
 
-    if args.download or args.subtitle == '':
+    if to_download or subtitle_file == '':
         srt_file = find_srt_file(video_name,output_dir)
         if srt_file is None:
             download_subtitles(video_name,output_dir)
             srt_file = find_srt_file(video_name,output_dir)
     else:
-        srt_file = args.subtitle
+        srt_file = subtitle_file
 
     if srt_file is not None:
         print("Found srt:",srt_file)
@@ -340,7 +341,9 @@ def main():
     print("Video duration : {}".format(video_duration))
 
     sampled_duration = video_duration - credits_length - intro_length
-    sample_times = np.floor(np.linspace(intro_length,video_duration-sample_duration,num_of_seg))
+    #print np.linspace_list(intro_length,video_duration-sample_duration,num_of_seg)
+
+    sample_times = np.list_floor(np.linspace_list(intro_length,video_duration-sample_duration,num_of_seg))
     print("Time samples:",sample_times)
 
     start_t,end_t,first_sentance_words = read_srt(srt_file)
@@ -357,6 +360,25 @@ def main():
     #print end_t
 
     fix_srt(srt_file,start_t,end_t)
+
+def main():
+
+    parser = argparse.ArgumentParser(description='SubSync')
+
+    parser.add_argument('-f','--filename',help='filename path',default='')
+    parser.add_argument('-od','--dir',help='output dir',default='.')
+    parser.add_argument('-d','--download',dest='download',help='download subtitles',action='store_true')
+    parser.add_argument('-nd','--no-download',dest='download',help='Dont download subtitles',action='store_false')
+    parser.add_argument('-s','--subtitle',help='subtitle file',default='')
+    args = parser.parse_args()
+
+    video_path = args.filename
+    output_dir = args.dir
+    to_download=args.download
+    subtitle_file = args.subtitle
+
+    download_and_create_shifted_srt(video_path,output_dir,to_download,subtitle_file)
+
 
 if __name__ == "__main__":
     main()
