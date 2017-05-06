@@ -1,0 +1,10 @@
+sync other language subtitles using english subtitles
+change subtitles download dir. (SubSceneDL, C:\Users\orubi)
+create installation package
+embed as subtitles addon
+remove requests dependecy
+handle streaming
+add opening subtitle
+update algorithm
+move cmd to background
+merge working version with standalone code
