@@ -1,7 +1,11 @@
 appdirs==1.4.3
+beautifulsoup4==4.5.3
+bs4==0.0.1
 chardet==3.0.2
+lxml==3.7.3
 numpy==1.12.1
 packaging==16.8
 pyparsing==2.2.0
 pysrt==1.1.1
+requests==2.13.0
 six==1.10.0
